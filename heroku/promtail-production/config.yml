@@ -1,0 +1,46 @@
+server:
+    http_listen_port: 9080
+    grpc_listen_port: 0
+    log_level: "info"
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+- url: https://${LOKI_TENANT_ID}:${LOKI_TOKEN}@${LOKI_HOST}/loki/api/v1/push
+
+scrape_configs:
+- job_name: ${JOB_NAME}
+  pipeline_stages:
+  - match:
+      selector: '{job="heroku_production"}'
+      stages:
+      - regex:
+          expression: '.*addon=(?P<database>[aA-zZ|\-|0-9]*).*db_size=(?P<db_size>\\d+)bytes.*tables=(?P<tables>\\d+).*active-connections=(?P<active_connections>\\d+).*waiting-connections=(?P<waiting_connections>\\d+).*index-cache-hit-rate=(?P<index_cache_hit_rate>[0-9|\.|0-9]+).*table-cache-hit-rate=(?P<table_cache_hit_rate>[0-9|\.|0-9]+).*load-avg-1m=(?P<load_avg_1m>[0-9|\.|0-9]+).*load-avg-5m=(?P<load_avg_5m>[0-9|\.|0-9]+).*load-avg-15m=(?P<load_avg_15m>[0-9|\.|0-9]+).*read-iops=(?P<read_iops>[0-9|\.|0-9]+).*write-iops=(?P<write_iops>[0-9|\.|0-9]+).*tmp-disk-used=(?P<tmp_disk_used>\\d+).*tmp-disk-available=(?P<tmp_disk_available>\\d+).*?memory-total=(?P<memory_total>\\d+).*?memory-free=(?P<memory_free>\\d+).*?memory-cached=(?P<memory_cached>\\d+).*?memory-postgres=(?P<memory_postgres>\\d+).*?wal-percentage-used=(?P<wal_percentage_used>.+)'
+      - labels:
+          database:
+  - match:
+      selector: '{job="heroku_production"}'
+      stages:
+      - regex:
+          expression: '.*method=(?P<method>[aA-zZ]+).*?path=\"(?P<path>.*?) .*?host=(?P<host>[aA-zZ|\-|\.]*).*?service=(?P<time_taken>[0-9]+).*?status=(?P<status_code>[0-9]+)'
+      - labels:
+          method:
+          host:
+          status_code:
+  relabel_configs:
+  - source_labels: ['__heroku_drain_host']
+    action: drop
+  - source_labels: ['__heroku_drain_app']
+    action: drop
+  - source_labels: ['__heroku_drain_proc']
+    target_label: 'proc'
+  
+
+  heroku_drain:
+    server:
+      http_listen_address: 0.0.0.0
+      http_listen_port: ${PORT}
+      log_level: info
+    labels: 
+      job: ${JOB_NAME}
